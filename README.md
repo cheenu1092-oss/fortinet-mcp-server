@@ -83,6 +83,19 @@ npm run start:code-mode -- --enable-write
 - `update_address_object` ⚠️ — Update address object
 - `delete_address_object` ⚠️ — Delete address object
 
+### Service Object Tools
+- `list_services` — List firewall service objects (TCP/UDP/ICMP ports)
+- `list_service_groups` — List firewall service groups
+- `create_service` ⚠️ — Create a firewall service object
+- `create_service_group` ⚠️ — Create a firewall service group
+- `delete_service` ⚠️ — Delete a firewall service object
+- `delete_service_group` ⚠️ — Delete a firewall service group
+
+### System Tools
+- `get_system_status` — Get system status (version, uptime, HA status)
+- `list_interfaces` — List network interfaces
+- `list_dhcp_leases` — List active DHCP leases
+
 ⚠️ = Requires `--enable-write` flag
 
 ## Development
@@ -116,8 +129,10 @@ src/
 ├── traditional/               # MCP tools mode
 │   ├── index.ts
 │   └── tools/
-│       ├── firewall.ts
-│       └── address.ts
+│       ├── firewall.ts        # Firewall policy tools
+│       ├── address.ts         # Address object tools
+│       ├── service.ts         # Service object tools
+│       └── system.ts          # System monitoring tools
 └── code-mode/                 # Programmatic API mode
     ├── index.ts
     ├── executor.ts
