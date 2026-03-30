@@ -45,7 +45,8 @@ export class FortiGateClient {
     body?: unknown
   ): Promise<T> {
     // Build URL with query params
-    const url = new URL(`${this.baseUrl}${path}`);
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const url = new URL(`${this.baseUrl}${normalizedPath}`);
     
     // Add VDOM parameter if specified
     if (this.config.vdom) {

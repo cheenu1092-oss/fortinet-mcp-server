@@ -7,9 +7,10 @@ global.fetch = vi.fn();
 
 const mockConfig: Config = {
   host: "https://firewall.example.com",
-  apiToken: "test-token-123",
+  token: "test-token-123",
   vdom: "root",
   verifySsl: true,
+  timeout: 30000,
   enableWrite: false,
 };
 
@@ -31,6 +32,7 @@ describe("FortiGateClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => mockResponse,
         text: async () => JSON.stringify(mockResponse),
       });
 
@@ -58,6 +60,7 @@ describe("FortiGateClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 201,
+        json: async () => mockResponse,
         text: async () => JSON.stringify(mockResponse),
       });
 
@@ -83,6 +86,7 @@ describe("FortiGateClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => mockResponse,
         text: async () => JSON.stringify(mockResponse),
       });
 
@@ -99,6 +103,7 @@ describe("FortiGateClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => mockResponse,
         text: async () => JSON.stringify(mockResponse),
       });
 
@@ -141,6 +146,7 @@ describe("FortiGateClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({ status: "success", results: [] }),
         text: async () => JSON.stringify({ status: "success", results: [] }),
       });
 
