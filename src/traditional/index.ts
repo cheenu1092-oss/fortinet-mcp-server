@@ -5,6 +5,8 @@ import { loadConfig } from "../config.js";
 import { FortiGateClient } from "../client.js";
 import { registerFirewallTools } from "./tools/firewall.js";
 import { registerAddressTools } from "./tools/address.js";
+import { registerServiceTools } from "./tools/service.js";
+import { registerSystemTools } from "./tools/system.js";
 
 async function main() {
   const config = loadConfig();
@@ -18,6 +20,8 @@ async function main() {
   // Register all tool groups
   registerFirewallTools(server, client, config);
   registerAddressTools(server, client, config);
+  registerServiceTools(server, client, config);
+  registerSystemTools(server, client, config);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
