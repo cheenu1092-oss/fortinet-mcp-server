@@ -1,0 +1,49 @@
+{
+  "name": "fortinet-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP (Model Context Protocol) server for FortiGate/FortiOS — firewall policy, NAT, routing, and system management via AI agents.",
+  "main": "dist/traditional/index.js",
+  "type": "module",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "tsup src/traditional/index.ts src/code-mode/index.ts --format esm --dts --clean",
+    "build:traditional": "tsup src/traditional/index.ts --format esm --dts",
+    "build:code-mode": "tsup src/code-mode/index.ts --format esm --dts",
+    "test": "vitest run",
+    "start:traditional": "node dist/traditional/index.js",
+    "start:code-mode": "node dist/code-mode/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cheenu1092-oss/fortinet-mcp-server.git"
+  },
+  "keywords": [
+    "mcp",
+    "fortigate",
+    "fortios",
+    "fortinet",
+    "firewall",
+    "ai",
+    "agent",
+    "automation"
+  ],
+  "author": "Cheenu (Srini)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cheenu1092-oss/fortinet-mcp-server/issues"
+  },
+  "homepage": "https://github.com/cheenu1092-oss/fortinet-mcp-server#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
