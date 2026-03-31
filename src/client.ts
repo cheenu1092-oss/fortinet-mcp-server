@@ -1,24 +1,15 @@
-import { Config } from "./config.js";
+import https from "https";
 
-export class FortiGateError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public response?: unknown
-  ) {
-    super(message);
-    this.name = "FortiGateError";
-  }
-}
-
-export interface FortiGateResponse<T = unknown> {
-  http_status: number;
-  results?: T[];
-  result?: T;
+export interface FortiAPIResponse<T = unknown> {
+  http_method: string;
+  revision: string;
+  results: T;
   vdom: string;
   path: string;
   name: string;
+  action: string;
   status: string;
+  http_status: number;
   serial: string;
   version: string;
   build: number;
@@ -26,144 +17,140 @@ export interface FortiGateResponse<T = unknown> {
 
 export class FortiGateClient {
   private baseUrl: string;
-  private headers: Record<string, string>;
-  private timeout: number;
+  private apiKey: string;
+  private vdom: string;
+  private agent: https.Agent;
 
-  constructor(private config: Config) {
-    this.baseUrl = `${config.host}/api/v2`;
-    this.headers = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.token}`,
-    };
-    this.timeout = config.timeout || 30000;
-  }
-
-  private async request<T = unknown>(
-    method: string,
-    path: string,
-    params?: Record<string, string>,
-    body?: unknown
-  ): Promise<T> {
-    // Build URL with query params
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const url = new URL(`${this.baseUrl}${normalizedPath}`);
-    
-    // Add VDOM parameter if specified
-    if (this.config.vdom) {
-      url.searchParams.set("vdom", this.config.vdom);
-    }
-
-    // Add additional params
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.set(key, value);
-      });
-    }
-
-    const options: RequestInit = {
-      method,
-      headers: this.headers,
-      signal: AbortSignal.timeout(this.timeout),
-    };
-
-    // Add body for POST/PUT
-    if (body && (method === "POST" || method === "PUT")) {
-      options.body = JSON.stringify(body);
-    }
-
-    // Make request
-    const response = await fetch(url.toString(), options);
-
-    // Handle response
-    if (!response.ok) {
-      let errorMessage = `FortiGate API error (${response.status})`;
-      try {
-        const errorData = await response.json();
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (errorData.results && errorData.results[0]?.message) {
-          errorMessage = errorData.results[0].message;
-        }
-      } catch {
-        errorMessage = await response.text();
-      }
-      throw new FortiGateError(errorMessage, response.status);
-    }
-
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    // Parse JSON response
-    const data: FortiGateResponse<T> = await response.json();
-
-    // Check API-level status
-    if (data.status !== "success") {
-      throw new FortiGateError(
-        `FortiGate API returned non-success status: ${data.status}`,
-        data.http_status,
-        data
-      );
-    }
-
-    // Return results or result depending on response structure
-    if (data.results !== undefined) {
-      return data.results as T;
-    } else if (data.result !== undefined) {
-      return data.result as T;
-    }
-
-    return data as T;
+  constructor(host: string, apiKey: string, vdom: string, verifySSL: boolean) {
+    this.baseUrl = `${host}/api/v2`;
+    this.apiKey = apiKey;
+    this.vdom = vdom;
+    this.agent = new https.Agent({
+      rejectUnauthorized: verifySSL,
+    });
   }
 
   /**
-   * GET request to read object(s)
+   * Generic GET request to FortiGate REST API
    */
   async get<T = unknown>(
     path: string,
-    params?: Record<string, string>
-  ): Promise<T> {
-    return this.request<T>("GET", path, params);
+    params: Record<string, string> = {}
+  ): Promise<FortiAPIResponse<T>> {
+    const queryParams = new URLSearchParams({
+      vdom: this.vdom,
+      ...params,
+    });
+
+    const url = `${this.baseUrl}/${path}?${queryParams}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      // @ts-expect-error - Node.js fetch supports agent
+      agent: this.agent,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `FortiGate API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return await response.json();
   }
 
   /**
-   * POST request to create object
+   * POST request (create)
    */
-  async post<T = unknown>(path: string, body: unknown): Promise<T> {
-    return this.request<T>("POST", path, undefined, body);
+  async post<T = unknown>(
+    path: string,
+    body: Record<string, unknown>
+  ): Promise<FortiAPIResponse<T>> {
+    const url = `${this.baseUrl}/${path}?vdom=${this.vdom}`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      // @ts-expect-error - Node.js fetch supports agent
+      agent: this.agent,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `FortiGate API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return await response.json();
   }
 
   /**
-   * PUT request to update object
+   * PUT request (update)
    */
   async put<T = unknown>(
     path: string,
-    body: unknown,
-    params?: Record<string, string>
-  ): Promise<T> {
-    return this.request<T>("PUT", path, params, body);
+    mkey: string,
+    body: Record<string, unknown>
+  ): Promise<FortiAPIResponse<T>> {
+    const url = `${this.baseUrl}/${path}/${mkey}?vdom=${this.vdom}`;
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      // @ts-expect-error - Node.js fetch supports agent
+      agent: this.agent,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `FortiGate API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return await response.json();
   }
 
   /**
-   * DELETE request to delete object
+   * DELETE request
    */
   async delete<T = unknown>(
     path: string,
-    params?: Record<string, string>
-  ): Promise<T> {
-    return this.request<T>("DELETE", path, params);
-  }
+    mkey: string
+  ): Promise<FortiAPIResponse<T>> {
+    const url = `${this.baseUrl}/${path}/${mkey}?vdom=${this.vdom}`;
 
-  /**
-   * List all objects of a given type (handles pagination if needed)
-   */
-  async getAll<T = unknown>(
-    path: string,
-    params?: Record<string, string>
-  ): Promise<T[]> {
-    // FortiGate API returns all results by default (no pagination needed for most endpoints)
-    const results = await this.get<T[]>(path, params);
-    return results || [];
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      // @ts-expect-error - Node.js fetch supports agent
+      agent: this.agent,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `FortiGate API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return await response.json();
   }
 }

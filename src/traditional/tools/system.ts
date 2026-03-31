@@ -6,19 +6,44 @@ import { Config } from "../../config.js";
 export function registerSystemTools(
   server: McpServer,
   client: FortiGateClient,
-  config: Config
+  _config: Config
 ): void {
   // get_system_status
   server.registerTool(
     "get_system_status",
     {
-      description: "Get system status (version, uptime, HA status, etc.)",
+      description: "Get system status and version information",
       inputSchema: {},
     },
     async () => {
-      const result = await client.get("monitor/system/status");
+      const response = await client.get("monitor/system/status");
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.results, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // get_system_performance
+  server.registerTool(
+    "get_system_performance",
+    {
+      description: "Get system performance statistics (CPU, memory, sessions)",
+      inputSchema: {},
+    },
+    async () => {
+      const response = await client.get("monitor/system/resource/usage");
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.results, null, 2),
+          },
+        ],
       };
     }
   );
@@ -27,38 +52,40 @@ export function registerSystemTools(
   server.registerTool(
     "list_interfaces",
     {
-      description: "List network interfaces",
-      inputSchema: {
-        filter: z.string().optional().describe("Filter expression"),
-      },
+      description: "List all network interfaces",
+      inputSchema: {},
     },
-    async (args) => {
-      const params: Record<string, string> = {};
-      if (args.filter) params.filter = args.filter;
-
-      const results = await client.get("cmdb/system/interface", params);
+    async () => {
+      const response = await client.get("cmdb/system/interface");
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.results, null, 2),
+          },
+        ],
       };
     }
   );
 
-  // list_dhcp_leases
+  // get_interface
   server.registerTool(
-    "list_dhcp_leases",
+    "get_interface",
     {
-      description: "List active DHCP leases",
+      description: "Get specific interface details",
       inputSchema: {
-        interface: z.string().optional().describe("Filter by interface name"),
+        name: z.string().describe("Interface name"),
       },
     },
     async (args) => {
-      const params: Record<string, string> = {};
-      if (args.interface) params.interface = args.interface;
-
-      const results = await client.get("monitor/system/dhcp", params);
+      const response = await client.get(`cmdb/system/interface/${args.name}`);
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(response.results, null, 2),
+          },
+        ],
       };
     }
   );

@@ -5,31 +5,33 @@ import { loadConfig } from "../config.js";
 import { FortiGateClient } from "../client.js";
 import { registerFirewallTools } from "./tools/firewall.js";
 import { registerAddressTools } from "./tools/address.js";
-import { registerServiceTools } from "./tools/service.js";
 import { registerSystemTools } from "./tools/system.js";
 
 async function main() {
   const config = loadConfig();
-  const client = new FortiGateClient(config);
+  const client = new FortiGateClient(
+    config.host,
+    config.apiKey,
+    config.vdom,
+    config.verifySSL
+  );
 
   const server = new McpServer({
     name: "fortinet-mcp-server",
     version: "1.0.0",
   });
 
-  // Register all tool groups
+  // Register tool categories
   registerFirewallTools(server, client, config);
   registerAddressTools(server, client, config);
-  registerServiceTools(server, client, config);
   registerSystemTools(server, client, config);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("Fortinet MCP Server started (traditional mode)");
-  if (config.enableWrite) {
-    console.error("⚠️ WRITE OPERATIONS ENABLED — Use with caution");
-  }
+  console.error("Fortinet MCP server running on stdio");
+  console.error(`Mode: Traditional (${config.enableWrite ? "read-write" : "read-only"})`);
+  console.error(`VDOM: ${config.vdom}`);
 }
 
 main().catch((error) => {

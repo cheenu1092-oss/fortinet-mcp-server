@@ -1,156 +1,119 @@
-# Fortinet MCP Server
+# 🔥 Fortinet MCP Server
 
-MCP (Model Context Protocol) server for FortiGate/FortiOS — firewall policy, NAT, routing, and system management via AI agents.
+MCP (Model Context Protocol) server for Fortinet FortiGate — firewall, VPN, SD-WAN management via AI agents.
 
-## Features
+Part of the [Net Infra MCP](https://github.com/cheenu1092-oss/net-infra-mcp) collection.
 
-- **Read Operations** (default):
-  - List and query firewall policies
-  - Manage address objects (hosts, subnets, ranges, FQDNs)
-  - View service objects
-  - Monitor system status and interfaces
-  - Check active sessions
+## Two Variants
 
-- **Write Operations** (gated by `--enable-write` flag):
-  - Create/update/delete firewall policies
-  - Create/update/delete address objects
-  - Manage service objects
-  - Configure NAT (VIP, IP pools)
+### Traditional Mode
+Pre-built MCP tools with typed inputs/outputs. Safe, discoverable, structured.
 
-## Installation
+```
+"Show me all firewall policies"
+→ calls list_firewall_policies()
+
+"Create a firewall policy allowing HTTPS from LAN to WAN"  
+→ calls create_firewall_policy(name="Allow-HTTPS", srcintf=[{name:"port1"}], ...)
+```
+
+### Code Mode
+Agent receives direct FortiGate REST API access. Power-user mode for complex operations.
+
+```
+"Find all disabled firewall policies and enable them"
+→ Agent composes: GET /api/v2/cmdb/firewall/policy?filter=status==disable
+→ Iterates and calls: PUT /api/v2/cmdb/firewall/policy/{policyid} with status=enable
+```
+
+## Supported Operations
+
+### Firewall Policies
+| Tool | API Path | Description |
+|------|----------|-------------|
+| `list_firewall_policies` | `cmdb/firewall/policy` | List all firewall policies |
+| `get_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Get specific policy |
+| `create_firewall_policy` | `cmdb/firewall/policy` | Create new policy |
+| `update_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Update existing policy |
+| `delete_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Delete policy |
+
+### Address Objects
+| Tool | API Path | Description |
+|------|----------|-------------|
+| `list_addresses` | `cmdb/firewall/address` | List all address objects |
+| `get_address` | `cmdb/firewall/address/{name}` | Get specific address |
+| `create_address` | `cmdb/firewall/address` | Create address (IP, range, FQDN, geo) |
+| `delete_address` | `cmdb/firewall/address/{name}` | Delete address |
+
+### System & Monitoring
+| Tool | API Path | Description |
+|------|----------|-------------|
+| `get_system_status` | `monitor/system/status` | System version and status |
+| `get_system_performance` | `monitor/system/resource/usage` | CPU, memory, sessions |
+| `list_interfaces` | `cmdb/system/interface` | List all interfaces |
+| `get_interface` | `cmdb/system/interface/{name}` | Get specific interface |
+
+## Configuration
+
+```json
+{
+  "fortinet": {
+    "host": "https://fortigate.example.com",
+    "api_key": "your-api-key-here",
+    "vdom": "root",
+    "verify_ssl": true
+  }
+}
+```
+
+Or via environment variables:
+```bash
+FORTINET_HOST=https://fortigate.example.com
+FORTINET_API_KEY=your-api-key-here
+FORTINET_VDOM=root
+FORTINET_VERIFY_SSL=true
+```
+
+### Generating an API Key
+
+1. Log in to FortiGate web UI
+2. Go to **System > Administrators**
+3. Create a new **REST API Admin** or edit existing admin
+4. Generate an API key and copy it (you won't see it again)
+5. Set appropriate permissions (read-write for write tools, read-only otherwise)
+
+## Security
+
+- **Read-only by default.** Write tools (`create_*`, `update_*`, `delete_*`) require `--enable-write` flag.
+- All API calls use Bearer token authentication.
+- SSL verification enabled by default.
+- Supports VDOM isolation for multi-tenant deployments.
+
+## Setup
 
 ```bash
 npm install
 npm run build
+
+# Traditional mode (read-only)
+npx fortinet-mcp-server
+
+# Traditional mode (read + write)
+npx fortinet-mcp-server --enable-write
+
+# Code mode
+npx fortinet-mcp-server --mode code
 ```
 
-## Configuration
+## Roadmap
 
-Set these environment variables:
-
-```bash
-export FORTIGATE_HOST=https://fortigate.example.com
-export FORTIGATE_TOKEN=your-api-token-here
-export FORTIGATE_VDOM=root                    # Optional, default: root
-export FORTIGATE_VERIFY_SSL=true              # Optional, default: true
-export FORTIGATE_TIMEOUT=30000                # Optional, default: 30000ms
-```
-
-### Getting an API Token
-
-1. Log into FortiGate web UI
-2. Navigate to **System > Administrators**
-3. Create a new **REST API Admin** user
-4. Set appropriate permissions (read-only or read-write)
-5. Generate an API token
-6. Copy the token (only shown once!)
-
-## Usage
-
-### Traditional Mode (MCP tools)
-
-```bash
-# Read-only mode (default)
-npm run start:traditional
-
-# Enable write operations (DANGEROUS)
-npm run start:traditional -- --enable-write
-```
-
-### Code Mode (programmatic API access)
-
-```bash
-# Read-only mode
-npm run start:code-mode
-
-# Enable write operations
-npm run start:code-mode -- --enable-write
-```
-
-## Available Tools
-
-### Firewall Policy Tools
-- `list_firewall_policies` — List all policies with filters
-- `get_firewall_policy` — Get specific policy by ID
-- `create_firewall_policy` ⚠️ — Create new policy
-- `update_firewall_policy` ⚠️ — Update existing policy
-- `delete_firewall_policy` ⚠️ — Delete policy
-
-### Address Object Tools
-- `list_address_objects` — List all address objects
-- `get_address_object` — Get specific address object
-- `create_address_object` ⚠️ — Create new address object
-- `update_address_object` ⚠️ — Update address object
-- `delete_address_object` ⚠️ — Delete address object
-
-### Service Object Tools
-- `list_services` — List firewall service objects (TCP/UDP/ICMP ports)
-- `list_service_groups` — List firewall service groups
-- `create_service` ⚠️ — Create a firewall service object
-- `create_service_group` ⚠️ — Create a firewall service group
-- `delete_service` ⚠️ — Delete a firewall service object
-- `delete_service_group` ⚠️ — Delete a firewall service group
-
-### System Tools
-- `get_system_status` — Get system status (version, uptime, HA status)
-- `list_interfaces` — List network interfaces
-- `list_dhcp_leases` — List active DHCP leases
-
-⚠️ = Requires `--enable-write` flag
-
-## Development
-
-```bash
-# Run tests
-npm test
-
-# Build TypeScript
-npm run build
-
-# Build specific mode
-npm run build:traditional
-npm run build:code-mode
-```
-
-## Security
-
-- **API tokens** are sensitive! Never commit them to version control
-- **Write operations** are disabled by default for safety
-- **SSL verification** is enabled by default
-- All API calls are logged for audit trails
-- VDOM isolation supported for multi-tenancy
-
-## Architecture
-
-```
-src/
-├── config.ts                  # Environment config
-├── client.ts                  # FortiGate REST API client
-├── traditional/               # MCP tools mode
-│   ├── index.ts
-│   └── tools/
-│       ├── firewall.ts        # Firewall policy tools
-│       ├── address.ts         # Address object tools
-│       ├── service.ts         # Service object tools
-│       └── system.ts          # System monitoring tools
-└── code-mode/                 # Programmatic API mode
-    ├── index.ts
-    ├── executor.ts
-    └── schemas/
-```
-
-## API Reference
-
-See [SPEC.md](./SPEC.md) for detailed FortiGate API documentation and tool specifications.
+- [ ] VPN tools (IPsec, SSL VPN)
+- [ ] SD-WAN health monitoring
+- [ ] Service objects management
+- [ ] Address groups
+- [ ] Route management
+- [ ] High Availability (HA) status
 
 ## License
 
-ISC
-
-## Related Projects
-
-- [infoblox-mcp-server](https://github.com/cheenu1092-oss/infoblox-mcp-server) — MCP server for Infoblox NIOS (DNS/DHCP/IPAM)
-
----
-
-Built with ❤️ using the [Model Context Protocol](https://modelcontextprotocol.io/)
+MIT

@@ -1,8 +1,8 @@
 {
   "name": "fortinet-mcp-server",
   "version": "1.0.0",
-  "description": "MCP (Model Context Protocol) server for FortiGate/FortiOS — firewall policy, NAT, routing, and system management via AI agents.",
-  "main": "dist/traditional/index.js",
+  "description": "MCP (Model Context Protocol) server for Fortinet FortiGate — firewall, VPN, SD-WAN management via AI agents.",
+  "main": "index.js",
   "type": "module",
   "directories": {
     "doc": "docs",
@@ -22,16 +22,16 @@
   },
   "keywords": [
     "mcp",
-    "fortigate",
-    "fortios",
     "fortinet",
+    "fortigate",
     "firewall",
-    "ai",
-    "agent",
-    "automation"
+    "vpn",
+    "sd-wan",
+    "security",
+    "ai-agent"
   ],
-  "author": "Cheenu (Srini)",
-  "license": "ISC",
+  "author": "Cheenu <cheenu1092@gmail.com>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/cheenu1092-oss/fortinet-mcp-server/issues"
   },

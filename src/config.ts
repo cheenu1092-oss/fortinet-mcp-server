@@ -1,29 +1,27 @@
 export interface Config {
   host: string;
-  token: string;
-  vdom?: string;
-  verifySsl: boolean;
-  timeout: number;
+  apiKey: string;
+  vdom: string; // Virtual Domain (default: "root")
+  verifySSL: boolean;
   enableWrite: boolean;
 }
 
 export function loadConfig(): Config {
-  const host = process.env.FORTIGATE_HOST;
-  const token = process.env.FORTIGATE_TOKEN;
+  const host = process.env.FORTINET_HOST;
+  const apiKey = process.env.FORTINET_API_KEY;
 
   if (!host) {
-    throw new Error("FORTIGATE_HOST environment variable is required");
+    throw new Error("FORTINET_HOST environment variable is required");
   }
-  if (!token) {
-    throw new Error("FORTIGATE_TOKEN environment variable is required");
+  if (!apiKey) {
+    throw new Error("FORTINET_API_KEY environment variable is required");
   }
 
   return {
     host: host.replace(/\/$/, ""), // Remove trailing slash
-    token,
-    vdom: process.env.FORTIGATE_VDOM || "root",
-    verifySsl: process.env.FORTIGATE_VERIFY_SSL !== "false",
-    timeout: parseInt(process.env.FORTIGATE_TIMEOUT || "30000", 10),
+    apiKey,
+    vdom: process.env.FORTINET_VDOM || "root",
+    verifySSL: process.env.FORTINET_VERIFY_SSL !== "false",
     enableWrite: process.argv.includes("--enable-write"),
   };
 }

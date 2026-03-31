@@ -1,160 +1,155 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { FortiGateClient, FortiGateError } from "../src/client.js";
-import { Config } from "../src/config.js";
+import { FortiGateClient } from "../src/client";
 
-// Mock fetch globally
+// Mock global fetch
 global.fetch = vi.fn();
-
-const mockConfig: Config = {
-  host: "https://firewall.example.com",
-  token: "test-token-123",
-  vdom: "root",
-  verifySsl: true,
-  timeout: 30000,
-  enableWrite: false,
-};
 
 describe("FortiGateClient", () => {
   let client: FortiGateClient;
 
   beforeEach(() => {
-    client = new FortiGateClient(mockConfig);
+    client = new FortiGateClient(
+      "https://fortigate.example.com",
+      "test-api-key",
+      "root",
+      true
+    );
     vi.clearAllMocks();
   });
 
-  describe("request", () => {
-    it("should make a GET request successfully", async () => {
+  describe("GET requests", () => {
+    it("should make a GET request with correct headers and URL", async () => {
       const mockResponse = {
-        status: "success",
-        results: [{ name: "policy1" }],
+        http_status: 200,
+        results: [{ name: "test-policy", policyid: 1 }],
       };
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        status: 200,
         json: async () => mockResponse,
-        text: async () => JSON.stringify(mockResponse),
       });
 
       const result = await client.get("cmdb/firewall/policy");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/v2/cmdb/firewall/policy"),
+        expect.stringContaining("cmdb/firewall/policy"),
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
-            Authorization: "Bearer test-token-123",
+            Authorization: "Bearer test-api-key",
           }),
         })
       );
-      expect(result).toEqual(mockResponse.results);
+
+      expect(result).toEqual(mockResponse);
     });
 
-    it("should handle POST requests with body", async () => {
+    it("should include query parameters in GET request", async () => {
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [] }),
+      });
+
+      await client.get("cmdb/firewall/policy", { filter: "name==test" });
+
+      const callUrl = (global.fetch as any).mock.calls[0][0];
+      expect(callUrl).toContain("filter=name%3D%3Dtest");
+      expect(callUrl).toContain("vdom=root");
+    });
+  });
+
+  describe("POST requests", () => {
+    it("should make a POST request with body", async () => {
       const mockResponse = {
-        status: "success",
-        results: { policyid: 1 },
+        http_status: 200,
+        results: { mkey: "new-address" },
       };
-      const postBody = { name: "test-policy" };
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        status: 201,
         json: async () => mockResponse,
-        text: async () => JSON.stringify(mockResponse),
       });
 
-      const result = await client.post("cmdb/firewall/policy", postBody);
+      const body = {
+        name: "test-address",
+        type: "ipmask",
+        subnet: "10.0.0.0/8",
+      };
+
+      const result = await client.post("cmdb/firewall/address", body);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/v2/cmdb/firewall/policy"),
+        expect.stringContaining("cmdb/firewall/address"),
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify(postBody),
+          body: JSON.stringify(body),
         })
       );
-      expect(result).toEqual(mockResponse.results);
-    });
 
-    it("should handle PUT requests", async () => {
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
+  describe("PUT requests", () => {
+    it("should make a PUT request with mkey and body", async () => {
       const mockResponse = {
-        status: "success",
-        results: { policyid: 1 },
+        http_status: 200,
+        results: { mkey: "1" },
       };
-      const putBody = { comments: "Updated policy" };
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        status: 200,
         json: async () => mockResponse,
-        text: async () => JSON.stringify(mockResponse),
       });
 
-      const result = await client.put("cmdb/firewall/policy/1", putBody);
+      const body = { status: "disable" };
 
-      expect(result).toEqual(mockResponse.results);
+      await client.put("cmdb/firewall/policy", "1", body);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("cmdb/firewall/policy/1"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(body),
+        })
+      );
     });
+  });
 
-    it("should handle DELETE requests", async () => {
+  describe("DELETE requests", () => {
+    it("should make a DELETE request with mkey", async () => {
       const mockResponse = {
-        status: "success",
+        http_status: 200,
+        results: {},
       };
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        status: 200,
         json: async () => mockResponse,
-        text: async () => JSON.stringify(mockResponse),
       });
 
-      const result = await client.delete("cmdb/firewall/policy/1");
+      await client.delete("cmdb/firewall/policy", "1");
 
-      expect(result).toBeDefined();
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("cmdb/firewall/policy/1"),
+        expect.objectContaining({
+          method: "DELETE",
+        })
+      );
     });
+  });
 
-    it("should handle 204 No Content responses", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-        text: async () => "",
-      });
-
-      const result = await client.delete("cmdb/firewall/policy/1");
-
-      expect(result).toBeUndefined();
-    });
-
-    it("should throw FortiGateError on failed requests", async () => {
-      const errorResponse = {
-        status: "error",
-        error: "Policy not found",
-        cli_error: "entry not found",
-      };
-
+  describe("Error handling", () => {
+    it("should throw on HTTP errors", async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
         status: 404,
-        text: async () => JSON.stringify(errorResponse),
+        statusText: "Not Found",
+        text: async () => "Resource not found",
       });
 
       await expect(client.get("cmdb/firewall/policy/999")).rejects.toThrow(
-        FortiGateError
-      );
-    });
-
-    it("should add vdom parameter to all requests", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ status: "success", results: [] }),
-        text: async () => JSON.stringify({ status: "success", results: [] }),
-      });
-
-      await client.get("cmdb/firewall/policy");
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("vdom=root"),
-        expect.any(Object)
+        "FortiGate API error: 404 Not Found"
       );
     });
   });
