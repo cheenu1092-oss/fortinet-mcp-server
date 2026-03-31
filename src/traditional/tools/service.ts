@@ -32,9 +32,9 @@ export function registerServiceTools(
         params.filter = filters.join("&");
       }
 
-      const results = await client.getAll("cmdb/firewall.service/custom", params);
+      const response = await client.get("cmdb/firewall.service/custom", params);
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(response.results, null, 2) }],
       };
     }
   );
@@ -52,9 +52,9 @@ export function registerServiceTools(
       const params: Record<string, string> = {};
       if (args.name) params.filter = `name==${args.name}`;
 
-      const results = await client.getAll("cmdb/firewall.service/group", params);
+      const response = await client.get("cmdb/firewall.service/group", params);
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(response.results, null, 2) }],
       };
     }
   );
