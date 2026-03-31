@@ -1,39 +1,53 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FortiGateClient } from "../../client.js";
+import { FortiClient } from "../../client.js";
 import { Config } from "../../config.js";
 
 export function registerFirewallTools(
   server: McpServer,
-  client: FortiGateClient,
+  client: FortiClient,
   config: Config
 ): void {
   // list_firewall_policies
   server.registerTool(
     "list_firewall_policies",
     {
-      description: "List all firewall policies",
+      description: "List all firewall security policies",
       inputSchema: {
-        filter: z
+        name: z
           .string()
           .optional()
-          .describe("Filter expression (e.g., name==myPolicy)"),
+          .describe("Filter by policy name (regex supported)"),
+        srcaddr: z
+          .string()
+          .optional()
+          .describe("Filter by source address object"),
+        dstaddr: z
+          .string()
+          .optional()
+          .describe("Filter by destination address object"),
+        service: z.string().optional().describe("Filter by service object"),
+        action: z
+          .enum(["accept", "deny", "ipsec"])
+          .optional()
+          .describe("Filter by policy action"),
       },
     },
     async (args) => {
       const params: Record<string, string> = {};
-      if (args.filter) {
-        params.filter = args.filter;
-      }
+      
+      if (args.name) params["name~"] = args.name;
+      if (args.srcaddr) params["srcaddr"] = args.srcaddr;
+      if (args.dstaddr) params["dstaddr"] = args.dstaddr;
+      if (args.service) params["service"] = args.service;
+      if (args.action) params["action"] = args.action;
 
-      const response = await client.get("cmdb/firewall/policy", params);
+      const results = await client.getAll(
+        "/api/v2/cmdb/firewall/policy",
+        params
+      );
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(response.results, null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );
@@ -42,22 +56,18 @@ export function registerFirewallTools(
   server.registerTool(
     "get_firewall_policy",
     {
-      description: "Get a specific firewall policy by ID (policyid)",
+      description: "Get a specific firewall policy by ID",
       inputSchema: {
-        policyid: z.number().describe("Policy ID"),
+        policyid: z.string().describe("Policy ID"),
       },
     },
     async (args) => {
-      const response = await client.get(
-        `cmdb/firewall/policy/${args.policyid}`
+      const result = await client.get(
+        "/api/v2/cmdb/firewall/policy",
+        args.policyid
       );
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(response.results, null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     }
   );
@@ -68,64 +78,60 @@ export function registerFirewallTools(
     server.registerTool(
       "create_firewall_policy",
       {
-        description: "Create a new firewall policy",
+        description: "Create a new firewall security policy",
         inputSchema: {
           name: z.string().describe("Policy name"),
           srcintf: z
-            .array(z.object({ name: z.string() }))
-            .describe("Source interface(s)"),
+            .array(z.string())
+            .describe("Source interface(s) (array of interface names)"),
           dstintf: z
-            .array(z.object({ name: z.string() }))
-            .describe("Destination interface(s)"),
+            .array(z.string())
+            .describe("Destination interface(s) (array of interface names)"),
           srcaddr: z
-            .array(z.object({ name: z.string() }))
-            .describe("Source address(es)"),
+            .array(z.string())
+            .describe("Source address object(s) (array of object names)"),
           dstaddr: z
-            .array(z.object({ name: z.string() }))
-            .describe("Destination address(es)"),
+            .array(z.string())
+            .describe("Destination address object(s) (array of object names)"),
           service: z
-            .array(z.object({ name: z.string() }))
-            .describe("Service(s)"),
+            .array(z.string())
+            .describe("Service object(s) (array of service names)"),
           action: z
             .enum(["accept", "deny", "ipsec"])
             .describe("Policy action"),
+          nat: z
+            .boolean()
+            .optional()
+            .describe("Enable NAT (default: false)"),
           schedule: z
             .string()
             .optional()
-            .describe("Schedule name (default: always)"),
-          status: z
-            .enum(["enable", "disable"])
-            .optional()
-            .describe("Enable/disable the policy"),
-          logtraffic: z
-            .enum(["all", "utm", "disable"])
-            .optional()
-            .describe("Log traffic"),
+            .describe("Schedule object name (default: always)"),
           comments: z.string().optional().describe("Policy comments"),
         },
       },
       async (args) => {
         const body: Record<string, unknown> = {
           name: args.name,
-          srcintf: args.srcintf,
-          dstintf: args.dstintf,
-          srcaddr: args.srcaddr,
-          dstaddr: args.dstaddr,
-          service: args.service,
+          srcintf: args.srcintf.map((intf) => ({ name: intf })),
+          dstintf: args.dstintf.map((intf) => ({ name: intf })),
+          srcaddr: args.srcaddr.map((addr) => ({ name: addr })),
+          dstaddr: args.dstaddr.map((addr) => ({ name: addr })),
+          service: args.service.map((svc) => ({ name: svc })),
           action: args.action,
-          schedule: args.schedule || "always",
-          status: args.status || "enable",
+          status: "enable",
         };
 
-        if (args.logtraffic) body.logtraffic = args.logtraffic;
+        if (args.nat !== undefined) body.nat = args.nat ? "enable" : "disable";
+        if (args.schedule) body.schedule = args.schedule;
         if (args.comments) body.comments = args.comments;
 
-        const response = await client.post("cmdb/firewall/policy", body);
+        const result = await client.post("/api/v2/cmdb/firewall/policy", body);
         return {
           content: [
             {
               type: "text",
-              text: `Created firewall policy: ${JSON.stringify(response.results, null, 2)}`,
+              text: `Created firewall policy: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
@@ -138,42 +144,68 @@ export function registerFirewallTools(
       {
         description: "Update an existing firewall policy",
         inputSchema: {
-          policyid: z.number().describe("Policy ID to update"),
+          policyid: z.string().describe("Policy ID to update"),
           name: z.string().optional().describe("New policy name"),
-          status: z
-            .enum(["enable", "disable"])
+          srcintf: z
+            .array(z.string())
             .optional()
-            .describe("Enable/disable the policy"),
+            .describe("New source interface(s)"),
+          dstintf: z
+            .array(z.string())
+            .optional()
+            .describe("New destination interface(s)"),
+          srcaddr: z
+            .array(z.string())
+            .optional()
+            .describe("New source address object(s)"),
+          dstaddr: z
+            .array(z.string())
+            .optional()
+            .describe("New destination address object(s)"),
+          service: z
+            .array(z.string())
+            .optional()
+            .describe("New service object(s)"),
           action: z
             .enum(["accept", "deny", "ipsec"])
             .optional()
-            .describe("Policy action"),
-          comments: z.string().optional().describe("Policy comments"),
+            .describe("New policy action"),
+          nat: z.boolean().optional().describe("Enable/disable NAT"),
+          comments: z.string().optional().describe("New comments"),
         },
       },
       async (args) => {
-        const { policyid, ...updates } = args;
         const body: Record<string, unknown> = {};
 
-        if (updates.name !== undefined) body.name = updates.name;
-        if (updates.status !== undefined) body.status = updates.status;
-        if (updates.action !== undefined) body.action = updates.action;
-        if (updates.comments !== undefined) body.comments = updates.comments;
+        if (args.name !== undefined) body.name = args.name;
+        if (args.srcintf !== undefined)
+          body.srcintf = args.srcintf.map((intf) => ({ name: intf }));
+        if (args.dstintf !== undefined)
+          body.dstintf = args.dstintf.map((intf) => ({ name: intf }));
+        if (args.srcaddr !== undefined)
+          body.srcaddr = args.srcaddr.map((addr) => ({ name: addr }));
+        if (args.dstaddr !== undefined)
+          body.dstaddr = args.dstaddr.map((addr) => ({ name: addr }));
+        if (args.service !== undefined)
+          body.service = args.service.map((svc) => ({ name: svc }));
+        if (args.action !== undefined) body.action = args.action;
+        if (args.nat !== undefined) body.nat = args.nat ? "enable" : "disable";
+        if (args.comments !== undefined) body.comments = args.comments;
 
         if (Object.keys(body).length === 0) {
           throw new Error("At least one field must be provided for update");
         }
 
-        const response = await client.put(
-          "cmdb/firewall/policy",
-          String(policyid),
+        const result = await client.put(
+          "/api/v2/cmdb/firewall/policy",
+          args.policyid,
           body
         );
         return {
           content: [
             {
               type: "text",
-              text: `Updated firewall policy ${policyid}: ${JSON.stringify(response.results, null, 2)}`,
+              text: `Updated firewall policy: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
@@ -186,19 +218,19 @@ export function registerFirewallTools(
       {
         description: "Delete a firewall policy",
         inputSchema: {
-          policyid: z.number().describe("Policy ID to delete"),
+          policyid: z.string().describe("Policy ID to delete"),
         },
       },
       async (args) => {
-        const response = await client.delete(
-          "cmdb/firewall/policy",
-          String(args.policyid)
+        const result = await client.delete(
+          "/api/v2/cmdb/firewall/policy",
+          args.policyid
         );
         return {
           content: [
             {
               type: "text",
-              text: `Deleted firewall policy ${args.policyid}: ${JSON.stringify(response.results, null, 2)}`,
+              text: `Deleted firewall policy ${args.policyid}: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };

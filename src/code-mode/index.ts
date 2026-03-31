@@ -1,99 +1,40 @@
 #!/usr/bin/env node
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "../config.js";
-import { FortiGateClient } from "../client.js";
-import { z } from "zod";
+import { FortiClient } from "../client.js";
 
-async function main() {
+// TODO: Implement code-mode executor tool
+// This will be a single execute_fortigate_api tool that accepts natural language
+
+async function main(): Promise<void> {
   const config = loadConfig();
-  const client = new FortiGateClient(
-    config.host,
-    config.apiKey,
-    config.vdom,
-    config.verifySSL
-  );
+
+  const client = new FortiClient({
+    host: config.host,
+    apiKey: config.apiKey,
+    vdom: config.vdom,
+    verifySsl: config.verifySsl,
+  });
 
   const server = new McpServer({
-    name: "fortinet-mcp-server-code",
+    name: "fortinet-mcp-server-code-mode",
     version: "1.0.0",
   });
 
-  // Single executor tool for code mode
-  server.registerTool(
-    "fortigate_api",
-    {
-      description:
-        "Execute FortiGate REST API calls. Full access to the FortiGate API schema.",
-      inputSchema: {
-        method: z
-          .enum(["GET", "POST", "PUT", "DELETE"])
-          .describe("HTTP method"),
-        path: z
-          .string()
-          .describe(
-            "API path (e.g., cmdb/firewall/policy or monitor/system/status)"
-          ),
-        body: z
-          .record(z.string(), z.unknown())
-          .optional()
-          .describe("Request body for POST/PUT"),
-        params: z
-          .record(z.string(), z.string())
-          .optional()
-          .describe("Query parameters"),
-        mkey: z
-          .string()
-          .optional()
-          .describe("Management key for PUT/DELETE on specific objects"),
-      },
-    },
-    async (args) => {
-      let response;
-
-      switch (args.method) {
-        case "GET":
-          response = await client.get(args.path, (args.params || {}) as Record<string, string>);
-          break;
-        case "POST":
-          if (!args.body) {
-            throw new Error("POST requires a body");
-          }
-          response = await client.post(args.path, args.body);
-          break;
-        case "PUT":
-          if (!args.body || !args.mkey) {
-            throw new Error("PUT requires both body and mkey");
-          }
-          response = await client.put(args.path, args.mkey, args.body);
-          break;
-        case "DELETE":
-          if (!args.mkey) {
-            throw new Error("DELETE requires mkey");
-          }
-          response = await client.delete(args.path, args.mkey);
-          break;
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(response, null, 2),
-          },
-        ],
-      };
-    }
-  );
+  // TODO: Register code-mode executor tool here
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("Fortinet MCP server running on stdio (Code Mode)");
-  console.error(`VDOM: ${config.vdom}`);
+  process.stderr.write(
+    "[fortinet-mcp-code] Code Mode - TODO: Implement executor\n"
+  );
+  process.stderr.write(`[fortinet-mcp-code] Connected to: ${config.host}\n`);
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  process.stderr.write(`[fortinet-mcp-code] Fatal error: ${String(error)}\n`);
   process.exit(1);
 });

@@ -1,119 +1,152 @@
-# 🔥 Fortinet MCP Server
+# fortinet-mcp-server
 
-MCP (Model Context Protocol) server for Fortinet FortiGate — firewall, VPN, SD-WAN management via AI agents.
+MCP (Model Context Protocol) server for Fortinet FortiOS/FortiGate firewalls — comprehensive firewall management via AI agents.
 
-Part of the [Net Infra MCP](https://github.com/cheenu1092-oss/net-infra-mcp) collection.
+## Features
 
-## Two Variants
+### Phase 1: Read-Only Operations (Traditional + Code-Mode)
+- **Firewall Policies:** List, search, and inspect security policies
+- **Address Objects:** Browse address groups, objects, and VIP configurations
+- **System Status:** Monitor CPU, memory, interfaces, HA status
+- **Session Management:** Query active sessions, NAT sessions
+- **Routing:** View routing tables, static routes, policy routes
+- **VPN:** Inspect IPsec, SSL VPN status and configurations
+
+### Phase 2: Write Operations (--enable-write flag)
+- **Policy Management:** Create, update, delete firewall policies
+- **Address Objects:** Create/update/delete address objects and groups
+- **VIP Configuration:** Create/update/delete virtual IPs for NAT
+- **Route Management:** Add/update/delete static routes
+- **VPN Management:** Configure IPsec tunnels, SSL VPN settings
+
+## Dual MCP Modes
 
 ### Traditional Mode
-Pre-built MCP tools with typed inputs/outputs. Safe, discoverable, structured.
+Standard MCP tools with discrete parameters for each operation.
 
-```
-"Show me all firewall policies"
-→ calls list_firewall_policies()
-
-"Create a firewall policy allowing HTTPS from LAN to WAN"  
-→ calls create_firewall_policy(name="Allow-HTTPS", srcintf=[{name:"port1"}], ...)
-```
-
-### Code Mode
-Agent receives direct FortiGate REST API access. Power-user mode for complex operations.
-
-```
-"Find all disabled firewall policies and enable them"
-→ Agent composes: GET /api/v2/cmdb/firewall/policy?filter=status==disable
-→ Iterates and calls: PUT /api/v2/cmdb/firewall/policy/{policyid} with status=enable
-```
-
-## Supported Operations
-
-### Firewall Policies
-| Tool | API Path | Description |
-|------|----------|-------------|
-| `list_firewall_policies` | `cmdb/firewall/policy` | List all firewall policies |
-| `get_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Get specific policy |
-| `create_firewall_policy` | `cmdb/firewall/policy` | Create new policy |
-| `update_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Update existing policy |
-| `delete_firewall_policy` | `cmdb/firewall/policy/{policyid}` | Delete policy |
-
-### Address Objects
-| Tool | API Path | Description |
-|------|----------|-------------|
-| `list_addresses` | `cmdb/firewall/address` | List all address objects |
-| `get_address` | `cmdb/firewall/address/{name}` | Get specific address |
-| `create_address` | `cmdb/firewall/address` | Create address (IP, range, FQDN, geo) |
-| `delete_address` | `cmdb/firewall/address/{name}` | Delete address |
-
-### System & Monitoring
-| Tool | API Path | Description |
-|------|----------|-------------|
-| `get_system_status` | `monitor/system/status` | System version and status |
-| `get_system_performance` | `monitor/system/resource/usage` | CPU, memory, sessions |
-| `list_interfaces` | `cmdb/system/interface` | List all interfaces |
-| `get_interface` | `cmdb/system/interface/{name}` | Get specific interface |
-
-## Configuration
-
-```json
-{
-  "fortinet": {
-    "host": "https://fortigate.example.com",
-    "api_key": "your-api-key-here",
-    "vdom": "root",
-    "verify_ssl": true
-  }
-}
-```
-
-Or via environment variables:
+**Start:**
 ```bash
-FORTINET_HOST=https://fortigate.example.com
-FORTINET_API_KEY=your-api-key-here
-FORTINET_VDOM=root
-FORTINET_VERIFY_SSL=true
+npm run start:traditional -- \
+  --fortigate-host https://192.168.1.1 \
+  --api-key YOUR_API_KEY \
+  --enable-write
 ```
 
-### Generating an API Key
+### Code-Mode (MCP Agent Mode)
+Single `execute_fortigate_api` tool accepting natural language instructions and FortiOS API JSON schema.
 
-1. Log in to FortiGate web UI
-2. Go to **System > Administrators**
-3. Create a new **REST API Admin** or edit existing admin
-4. Generate an API key and copy it (you won't see it again)
-5. Set appropriate permissions (read-write for write tools, read-only otherwise)
+**Start:**
+```bash
+npm run start:code-mode -- \
+  --fortigate-host https://192.168.1.1 \
+  --api-key YOUR_API_KEY \
+  --enable-write
+```
 
-## Security
-
-- **Read-only by default.** Write tools (`create_*`, `update_*`, `delete_*`) require `--enable-write` flag.
-- All API calls use Bearer token authentication.
-- SSL verification enabled by default.
-- Supports VDOM isolation for multi-tenant deployments.
-
-## Setup
+## Installation
 
 ```bash
 npm install
 npm run build
-
-# Traditional mode (read-only)
-npx fortinet-mcp-server
-
-# Traditional mode (read + write)
-npx fortinet-mcp-server --enable-write
-
-# Code mode
-npx fortinet-mcp-server --mode code
 ```
 
-## Roadmap
+## Configuration
 
-- [ ] VPN tools (IPsec, SSL VPN)
-- [ ] SD-WAN health monitoring
-- [ ] Service objects management
-- [ ] Address groups
-- [ ] Route management
-- [ ] High Availability (HA) status
+Set environment variables or pass as CLI args:
+
+```bash
+export FORTIGATE_HOST=https://192.168.1.1
+export FORTIGATE_API_KEY=your_api_key_here
+export FORTIGATE_ENABLE_WRITE=true  # Optional: enable write operations
+```
+
+## API Coverage
+
+Based on FortiOS REST API v7.0+:
+
+- `/api/v2/cmdb/firewall/policy` - Security policies
+- `/api/v2/cmdb/firewall/address` - Address objects
+- `/api/v2/cmdb/firewall/addrgrp` - Address groups
+- `/api/v2/cmdb/firewall/vip` - Virtual IP objects
+- `/api/v2/monitor/system/resource` - System resource usage
+- `/api/v2/monitor/firewall/session` - Active sessions
+- `/api/v2/monitor/router/ipv4` - Routing table
+- `/api/v2/monitor/vpn/ipsec` - IPsec VPN status
+- `/api/v2/monitor/vpn/ssl` - SSL VPN status
+
+## Security
+
+- **API Key Authentication:** Uses FortiOS API tokens (never username/password)
+- **Write Protection:** All write operations gated behind `--enable-write` flag
+- **TLS Verification:** Strict certificate validation (configurable for lab environments)
+- **Audit Logging:** All write operations logged with timestamps and user context
+
+## Development
+
+```bash
+# Build
+npm run build
+
+# Run tests
+npm test
+
+# Traditional mode (dev)
+npm run start:traditional
+
+# Code-mode (dev)
+npm run start:code-mode
+```
+
+## Project Structure
+
+```
+fortinet-mcp-server/
+├── README.md
+├── SPEC.md                    # Detailed technical specification
+├── package.json
+├── tsconfig.json
+├── vitest.config.ts
+├── src/
+│   ├── client.ts              # FortiOS REST API client
+│   ├── config.ts              # Configuration management
+│   ├── traditional/
+│   │   ├── index.ts           # Traditional MCP server entry
+│   │   └── tools/
+│   │       ├── firewall.ts    # Firewall policy tools
+│   │       ├── address.ts     # Address object tools
+│   │       ├── vip.ts         # VIP tools
+│   │       ├── routing.ts     # Routing tools
+│   │       ├── vpn.ts         # VPN tools
+│   │       └── system.ts      # System monitoring tools
+│   └── code-mode/
+│       ├── index.ts           # Code-mode MCP server entry
+│       ├── executor.ts        # API executor with validation
+│       └── schemas/
+│           └── fortios-api-schema.json
+├── tests/
+│   ├── client.test.ts
+│   ├── firewall-tools.test.ts
+│   ├── address-tools.test.ts
+│   ├── vip-tools.test.ts
+│   ├── routing-tools.test.ts
+│   ├── vpn-tools.test.ts
+│   └── system-tools.test.ts
+└── docs/
+    ├── api-reference.md
+    └── examples.md
+```
 
 ## License
 
-MIT
+ISC
+
+## Related Projects
+
+- [infoblox-mcp-server](https://github.com/cheenu1092-oss/infoblox-mcp-server) - Infoblox NIOS DDI management
+- Net-Infra-MCP - Multi-vendor network infrastructure MCP toolkit
+
+---
+
+**Status:** 🚧 In Development  
+**Maintainer:** Cheenu (cheenu1092@gmail.com)  
+**Part of:** Net-Infra-MCP Project

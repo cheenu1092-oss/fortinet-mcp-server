@@ -1,23 +1,26 @@
 #!/usr/bin/env node
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "../config.js";
-import { FortiGateClient } from "../client.js";
+import { FortiClient } from "../client.js";
 import { registerFirewallTools } from "./tools/firewall.js";
 import { registerAddressTools } from "./tools/address.js";
 import { registerSystemTools } from "./tools/system.js";
-import { registerServiceTools } from "./tools/service.js";
-import { registerVpnTools } from "./tools/vpn.js";
 
-async function main() {
+async function main(): Promise<void> {
+  // Load configuration
   const config = loadConfig();
-  const client = new FortiGateClient(
-    config.host,
-    config.apiKey,
-    config.vdom,
-    config.verifySSL
-  );
 
+  // Initialize FortiClient
+  const client = new FortiClient({
+    host: config.host,
+    apiKey: config.apiKey,
+    vdom: config.vdom,
+    verifySsl: config.verifySsl,
+  });
+
+  // Create MCP server
   const server = new McpServer({
     name: "fortinet-mcp-server",
     version: "1.0.0",
@@ -27,18 +30,23 @@ async function main() {
   registerFirewallTools(server, client, config);
   registerAddressTools(server, client, config);
   registerSystemTools(server, client, config);
-  registerServiceTools(server, client, config);
-  registerVpnTools(server, client, config);
 
+  // Start server with stdio transport
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("Fortinet MCP server running on stdio");
-  console.error(`Mode: Traditional (${config.enableWrite ? "read-write" : "read-only"})`);
-  console.error(`VDOM: ${config.vdom}`);
+  if (config.enableWrite) {
+    process.stderr.write("[fortinet-mcp] Write mode ENABLED\n");
+  } else {
+    process.stderr.write(
+      "[fortinet-mcp] Read-only mode (pass --enable-write to enable mutations)\n"
+    );
+  }
+  process.stderr.write(`[fortinet-mcp] Connected to: ${config.host}\n`);
+  process.stderr.write(`[fortinet-mcp] VDOM: ${config.vdom}\n`);
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  process.stderr.write(`[fortinet-mcp] Fatal error: ${String(error)}\n`);
   process.exit(1);
 });
