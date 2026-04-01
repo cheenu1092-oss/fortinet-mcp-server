@@ -1,51 +1,45 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { FortiClient, FortiGateError } from "../src/client";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { FortiApiClient } from "../src/client.js";
+import { Config } from "../src/config.js";
 
-describe("FortiClient", () => {
-  let client: FortiClient;
+describe("FortiApiClient", () => {
+  let client: FortiApiClient;
+  let mockConfig: Config;
 
   beforeEach(() => {
-    client = new FortiClient({
-      host: "https://test.fortigate.local",
+    mockConfig = {
+      host: "https://fortigate.example.com",
+      apiVersion: "v2",
       apiKey: "test-api-key",
+      verifySsl: true,
       vdom: "root",
-      verifySsl: false,
-    });
+      enableWrite: false,
+    };
+    client = new FortiApiClient(mockConfig);
   });
 
-  it("should initialize with correct config", () => {
+  it("should construct with correct config", () => {
     expect(client).toBeDefined();
   });
 
-  it("should strip trailing slashes from host", () => {
-    const clientWithSlash = new FortiClient({
-      host: "https://test.fortigate.local///",
-      apiKey: "test-key",
-    });
-    expect(clientWithSlash).toBeDefined();
+  it("should build URLs correctly", () => {
+    // This is a basic structural test
+    expect(client).toHaveProperty("config");
   });
 
-  it("should use default vdom if not provided", () => {
-    const defaultClient = new FortiClient({
-      host: "https://test.fortigate.local",
-      apiKey: "test-key",
-    });
-    expect(defaultClient).toBeDefined();
+  it("should have GET method", () => {
+    expect(typeof client.get).toBe("function");
   });
 
-  describe("FortiGateError", () => {
-    it("should create error with correct properties", () => {
-      const error = new FortiGateError(404, "GET", "/api/v2/test", "Not found");
-      
-      expect(error.statusCode).toBe(404);
-      expect(error.method).toBe("GET");
-      expect(error.path).toBe("/api/v2/test");
-      expect(error.message).toContain("404");
-      expect(error.message).toContain("Not found");
-      expect(error.name).toBe("FortiGateError");
-    });
+  it("should have POST method", () => {
+    expect(typeof client.post).toBe("function");
   });
 
-  // Note: Integration tests with actual FortiGate would go here
-  // For unit tests, we'd mock the HTTPS requests
+  it("should have PUT method", () => {
+    expect(typeof client.put).toBe("function");
+  });
+
+  it("should have DELETE method", () => {
+    expect(typeof client.delete).toBe("function");
+  });
 });

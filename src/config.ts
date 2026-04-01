@@ -1,47 +1,32 @@
 export interface Config {
   host: string;
+  apiVersion: string;
   apiKey: string;
-  vdom: string;
   verifySsl: boolean;
+  vdom: string; // Virtual Domain (default: root)
   enableWrite: boolean;
 }
 
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`Required environment variable ${name} is not set`);
+  return val;
+}
+
 export function loadConfig(): Config {
-  const host = process.env.FORTIGATE_HOST || "";
-  const apiKey = process.env.FORTIGATE_API_KEY || "";
-  const vdom = process.env.FORTIGATE_VDOM || "root";
-  const verifySsl = process.env.FORTIGATE_VERIFY_SSL !== "false";
-  const enableWrite = process.env.FORTIGATE_ENABLE_WRITE === "true";
+  const verifySsl = process.env["FORTINET_VERIFY_SSL"] !== "false";
 
-  // Parse CLI args
-  const args = process.argv.slice(2);
-  const config: Config = { host, apiKey, vdom, verifySsl, enableWrite };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--fortigate-host" && args[i + 1]) {
-      config.host = args[++i];
-    } else if (arg === "--api-key" && args[i + 1]) {
-      config.apiKey = args[++i];
-    } else if (arg === "--vdom" && args[i + 1]) {
-      config.vdom = args[++i];
-    } else if (arg === "--no-verify-ssl") {
-      config.verifySsl = false;
-    } else if (arg === "--enable-write") {
-      config.enableWrite = true;
-    }
+  // Allow self-signed certs when SSL verification is disabled
+  if (!verifySsl) {
+    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
   }
 
-  if (!config.host) {
-    throw new Error(
-      "FORTIGATE_HOST is required (env var or --fortigate-host flag)"
-    );
-  }
-  if (!config.apiKey) {
-    throw new Error(
-      "FORTIGATE_API_KEY is required (env var or --api-key flag)"
-    );
-  }
-
-  return config;
+  return {
+    host: requireEnv("FORTINET_HOST").replace(/\/$/, ""),
+    apiVersion: process.env["FORTINET_API_VERSION"] ?? "v2",
+    apiKey: requireEnv("FORTINET_API_KEY"),
+    verifySsl,
+    vdom: process.env["FORTINET_VDOM"] ?? "root",
+    enableWrite: process.argv.includes("--enable-write"),
+  };
 }

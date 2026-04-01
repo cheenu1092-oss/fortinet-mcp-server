@@ -1,7 +1,7 @@
 {
   "name": "fortinet-mcp-server",
   "version": "1.0.0",
-  "description": "MCP (Model Context Protocol) server for Fortinet FortiGate firewalls — comprehensive firewall management via AI agents.",
+  "description": "MCP (Model Context Protocol) server for Fortinet FortiGate — firewall policy, address objects, VPN, and system management via AI agents.",
   "main": "index.js",
   "type": "module",
   "directories": {
@@ -20,17 +20,8 @@
     "type": "git",
     "url": "git+https://github.com/cheenu1092-oss/fortinet-mcp-server.git"
   },
-  "keywords": [
-    "fortinet",
-    "fortigate",
-    "firewall",
-    "mcp",
-    "model-context-protocol",
-    "ai",
-    "agent",
-    "network-automation"
-  ],
-  "author": "Cheenu <cheenu1092@gmail.com>",
+  "keywords": ["fortinet", "fortigate", "firewall", "mcp", "ai", "automation"],
+  "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/cheenu1092-oss/fortinet-mcp-server/issues"

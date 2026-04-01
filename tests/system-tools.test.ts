@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { FortiClient } from "../src/client.js";
+import { FortiApiClient } from "../src/client.js";
 import { Config } from "../src/config.js";
 import { registerSystemTools } from "../src/traditional/tools/system.js";
 
 const mockConfig: Config = {
   host: "https://fortigate.example.com",
+  apiVersion: "v2",
   apiKey: "test-api-key",
   verifySsl: true,
   vdom: "root",
@@ -14,14 +15,14 @@ const mockConfig: Config = {
 
 describe("System Tools", () => {
   let server: McpServer;
-  let client: FortiClient;
+  let client: FortiApiClient;
 
   beforeEach(() => {
     server = new McpServer({
       name: "test-server",
       version: "1.0.0",
     });
-    client = new FortiClient(mockConfig);
+    client = new FortiApiClient(mockConfig);
   });
 
   it("should register without errors", () => {

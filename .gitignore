@@ -1,8 +1,5 @@
 node_modules/
 dist/
-*.log
 .env
+*.log
 .DS_Store
-coverage/
-*.test.d.ts
-tests/CLAUDE.md

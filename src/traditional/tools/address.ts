@@ -1,63 +1,56 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FortiClient } from "../../client.js";
+import { FortiApiClient } from "../../client.js";
 import { Config } from "../../config.js";
-
-const ADDRESS_TYPES = ["ipmask", "iprange", "fqdn", "geography"] as const;
 
 export function registerAddressTools(
   server: McpServer,
-  client: FortiClient,
+  client: FortiApiClient,
   config: Config
 ): void {
   // list_address_objects
   server.registerTool(
     "list_address_objects",
     {
-      description: "List all address objects",
+      description: "List firewall address objects",
       inputSchema: {
-        name: z
-          .string()
-          .optional()
-          .describe("Filter by name (regex supported)"),
+        name: z.string().optional().describe("Filter by address name"),
         type: z
-          .enum(ADDRESS_TYPES)
+          .enum(["ipmask", "iprange", "fqdn", "geography", "dynamic"])
           .optional()
           .describe("Filter by address type"),
       },
     },
     async (args) => {
       const params: Record<string, string> = {};
-
-      if (args.name) params["name~"] = args.name;
+      
+      if (args.name) params["name"] = args.name;
       if (args.type) params["type"] = args.type;
 
-      const results = await client.getAll("/api/v2/cmdb/firewall/address", params);
+      const response = await client.get("/cmdb/firewall/address", params);
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
       };
     }
   );
 
-  // list_address_groups
+  // get_address_object
   server.registerTool(
-    "list_address_groups",
+    "get_address_object",
     {
-      description: "List all address groups",
+      description: "Get a specific address object by name",
       inputSchema: {
-        name: z
-          .string()
-          .optional()
-          .describe("Filter by group name (regex supported)"),
+        name: z.string().describe("Address object name"),
       },
     },
     async (args) => {
-      const params: Record<string, string> = {};
-      if (args.name) params["name~"] = args.name;
-
-      const results = await client.getAll("/api/v2/cmdb/firewall/addrgrp", params);
+      const response = await client.get(`/cmdb/firewall/address/${args.name}`);
       return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
       };
     }
   );
@@ -72,63 +65,52 @@ export function registerAddressTools(
         inputSchema: {
           name: z.string().describe("Address object name"),
           type: z
-            .enum(ADDRESS_TYPES)
-            .describe("Address type (ipmask, iprange, fqdn, geography)"),
-          // Type-specific fields
+            .enum(["ipmask", "iprange", "fqdn", "geography"])
+            .optional()
+            .describe("Address type (default: ipmask)"),
           subnet: z
             .string()
             .optional()
-            .describe("Subnet in CIDR notation (for ipmask type)"),
+            .describe("Subnet in CIDR notation (for ipmask type, e.g. 192.168.1.0/24)"),
           start_ip: z.string().optional().describe("Start IP (for iprange type)"),
           end_ip: z.string().optional().describe("End IP (for iprange type)"),
-          fqdn: z.string().optional().describe("Fully qualified domain name (for fqdn type)"),
+          fqdn: z.string().optional().describe("FQDN (for fqdn type)"),
           country: z.string().optional().describe("Country code (for geography type)"),
-          comment: z.string().optional().describe("Comment for the address object"),
+          comment: z.string().optional().describe("Comment"),
         },
       },
       async (args) => {
+        const type = args.type ?? "ipmask";
         const body: Record<string, unknown> = {
           name: args.name,
-          type: args.type,
+          type,
         };
 
-        // Validate and add type-specific fields
-        switch (args.type) {
-          case "ipmask":
-            if (!args.subnet) {
-              throw new Error("subnet is required for ipmask type");
-            }
-            body.subnet = args.subnet;
-            break;
-          case "iprange":
-            if (!args.start_ip || !args.end_ip) {
-              throw new Error("start_ip and end_ip are required for iprange type");
-            }
-            body["start-ip"] = args.start_ip;
-            body["end-ip"] = args.end_ip;
-            break;
-          case "fqdn":
-            if (!args.fqdn) {
-              throw new Error("fqdn is required for fqdn type");
-            }
-            body.fqdn = args.fqdn;
-            break;
-          case "geography":
-            if (!args.country) {
-              throw new Error("country is required for geography type");
-            }
-            body.country = args.country;
-            break;
+        if (type === "ipmask") {
+          if (!args.subnet) throw new Error("subnet is required for ipmask type");
+          body.subnet = args.subnet;
+        } else if (type === "iprange") {
+          if (!args.start_ip || !args.end_ip) {
+            throw new Error("start_ip and end_ip are required for iprange type");
+          }
+          body["start-ip"] = args.start_ip;
+          body["end-ip"] = args.end_ip;
+        } else if (type === "fqdn") {
+          if (!args.fqdn) throw new Error("fqdn is required for fqdn type");
+          body.fqdn = args.fqdn;
+        } else if (type === "geography") {
+          if (!args.country) throw new Error("country is required for geography type");
+          body.country = args.country;
         }
 
         if (args.comment) body.comment = args.comment;
 
-        const result = await client.post("/api/v2/cmdb/firewall/address", body);
+        const response = await client.post("/cmdb/firewall/address", body);
         return {
           content: [
             {
               type: "text",
-              text: `Created address object: ${JSON.stringify(result, null, 2)}`,
+              text: `Created address object: ${JSON.stringify(response, null, 2)}`,
             },
           ],
         };
@@ -142,10 +124,7 @@ export function registerAddressTools(
         description: "Update an existing address object",
         inputSchema: {
           name: z.string().describe("Address object name to update"),
-          subnet: z
-            .string()
-            .optional()
-            .describe("New subnet (for ipmask type)"),
+          subnet: z.string().optional().describe("New subnet (for ipmask type)"),
           start_ip: z.string().optional().describe("New start IP (for iprange type)"),
           end_ip: z.string().optional().describe("New end IP (for iprange type)"),
           fqdn: z.string().optional().describe("New FQDN (for fqdn type)"),
@@ -153,28 +132,25 @@ export function registerAddressTools(
         },
       },
       async (args) => {
-        const body: Record<string, unknown> = {};
-
-        if (args.subnet !== undefined) body.subnet = args.subnet;
-        if (args.start_ip !== undefined) body["start-ip"] = args.start_ip;
-        if (args.end_ip !== undefined) body["end-ip"] = args.end_ip;
-        if (args.fqdn !== undefined) body.fqdn = args.fqdn;
-        if (args.comment !== undefined) body.comment = args.comment;
-
-        if (Object.keys(body).length === 0) {
+        const { name, ...updates } = args;
+        
+        if (Object.keys(updates).length === 0) {
           throw new Error("At least one field must be provided for update");
         }
 
-        const result = await client.put(
-          "/api/v2/cmdb/firewall/address",
-          args.name,
-          body
-        );
+        const body: Record<string, unknown> = {};
+        if (updates.subnet) body.subnet = updates.subnet;
+        if (updates.start_ip) body["start-ip"] = updates.start_ip;
+        if (updates.end_ip) body["end-ip"] = updates.end_ip;
+        if (updates.fqdn) body.fqdn = updates.fqdn;
+        if (updates.comment) body.comment = updates.comment;
+
+        const response = await client.put(`/cmdb/firewall/address/${name}`, body);
         return {
           content: [
             {
               type: "text",
-              text: `Updated address object: ${JSON.stringify(result, null, 2)}`,
+              text: `Updated address object ${name}: ${JSON.stringify(response, null, 2)}`,
             },
           ],
         };
@@ -191,15 +167,12 @@ export function registerAddressTools(
         },
       },
       async (args) => {
-        const result = await client.delete(
-          "/api/v2/cmdb/firewall/address",
-          args.name
-        );
+        const response = await client.delete(`/cmdb/firewall/address/${args.name}`);
         return {
           content: [
             {
               type: "text",
-              text: `Deleted address object ${args.name}: ${JSON.stringify(result, null, 2)}`,
+              text: `Deleted address object ${args.name}: ${JSON.stringify(response, null, 2)}`,
             },
           ],
         };

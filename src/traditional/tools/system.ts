@@ -1,108 +1,127 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FortiClient } from "../../client.js";
+import { FortiApiClient } from "../../client.js";
 import { Config } from "../../config.js";
 
 export function registerSystemTools(
   server: McpServer,
-  client: FortiClient,
-  _config: Config
+  client: FortiApiClient,
+  config: Config
 ): void {
   // get_system_status
   server.registerTool(
     "get_system_status",
     {
-      description: "Get system resource usage and status (CPU, memory, disk, sessions)",
-      inputSchema: {
-        interval: z
-          .enum(["1min", "5min", "30min", "1hour"])
-          .optional()
-          .describe("Time interval for averages (default: 1min)"),
-      },
-    },
-    async (args) => {
-      const params: Record<string, string> = {};
-      if (args.interval) params.interval = args.interval;
-
-      const result = await client.get("/api/v2/monitor/system/resource", undefined, params);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    }
-  );
-
-  // get_interface_status
-  server.registerTool(
-    "get_interface_status",
-    {
-      description: "Get interface statistics and status",
-      inputSchema: {
-        interface_name: z
-          .string()
-          .optional()
-          .describe("Filter by specific interface name"),
-      },
-    },
-    async (args) => {
-      const params: Record<string, string> = {};
-      if (args.interface_name) params.interface_name = args.interface_name;
-
-      const result = await client.get("/api/v2/monitor/system/interface", undefined, params);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    }
-  );
-
-  // get_ha_status
-  server.registerTool(
-    "get_ha_status",
-    {
-      description: "Get HA (High Availability) cluster status",
+      description: "Get system status (version, uptime, resources)",
       inputSchema: {},
     },
     async () => {
-      const result = await client.get("/api/v2/monitor/system/ha-peer");
+      const response = await client.get("/monitor/system/status");
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
       };
     }
   );
 
-  // list_active_sessions
+  // get_system_resources
   server.registerTool(
-    "list_active_sessions",
+    "get_system_resources",
     {
-      description: "Query active firewall sessions",
+      description: "Get system resource usage (CPU, memory, disk)",
+      inputSchema: {},
+    },
+    async () => {
+      const response = await client.get("/monitor/system/resource/usage");
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
+      };
+    }
+  );
+
+  // list_interfaces
+  server.registerTool(
+    "list_interfaces",
+    {
+      description: "List network interfaces",
       inputSchema: {
-        ip_version: z
-          .enum(["ipv4", "ipv6"])
-          .optional()
-          .describe("Filter by IP version"),
-        src: z.string().optional().describe("Filter by source IP"),
-        dest: z.string().optional().describe("Filter by destination IP"),
-        protocol: z
-          .enum(["tcp", "udp", "icmp"])
-          .optional()
-          .describe("Filter by protocol"),
-        limit: z
-          .number()
-          .optional()
-          .describe("Maximum number of sessions to return (default: 100)"),
+        name: z.string().optional().describe("Filter by interface name"),
       },
     },
     async (args) => {
       const params: Record<string, string> = {};
+      if (args.name) params["name"] = args.name;
 
-      if (args.ip_version) params.ip_version = args.ip_version;
-      if (args.src) params.src = args.src;
-      if (args.dest) params.dest = args.dest;
-      if (args.protocol) params.protocol = args.protocol;
-      if (args.limit) params.count = String(args.limit);
-
-      const result = await client.get("/api/v2/monitor/firewall/session", undefined, params);
+      const response = await client.get("/cmdb/system/interface", params);
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
+      };
+    }
+  );
+
+  // get_interface
+  server.registerTool(
+    "get_interface",
+    {
+      description: "Get a specific interface by name",
+      inputSchema: {
+        name: z.string().describe("Interface name"),
+      },
+    },
+    async (args) => {
+      const response = await client.get(`/cmdb/system/interface/${args.name}`);
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
+      };
+    }
+  );
+
+  // list_static_routes
+  server.registerTool(
+    "list_static_routes",
+    {
+      description: "List static routes",
+      inputSchema: {},
+    },
+    async () => {
+      const response = await client.get("/cmdb/router/static");
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
+      };
+    }
+  );
+
+  // get_sessions
+  server.registerTool(
+    "get_sessions",
+    {
+      description: "Get active sessions (connections)",
+      inputSchema: {
+        count: z.number().optional().describe("Number of sessions to return (default: 100)"),
+        srcaddr: z.string().optional().describe("Filter by source IP"),
+        dstaddr: z.string().optional().describe("Filter by destination IP"),
+      },
+    },
+    async (args) => {
+      const params: Record<string, string> = {};
+      if (args.count) params["count"] = String(args.count);
+      if (args.srcaddr) params["srcaddr"] = args.srcaddr;
+      if (args.dstaddr) params["dstaddr"] = args.dstaddr;
+
+      const response = await client.get("/monitor/firewall/session", params);
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(response.results, null, 2) },
+        ],
       };
     }
   );
