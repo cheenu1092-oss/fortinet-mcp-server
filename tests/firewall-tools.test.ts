@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { registerFirewallTools } from "../src/traditional/tools/firewall.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { FortiApiClient } from "../src/client.js";
+import { FortiGateClient } from "../src/client.js";
 import { Config } from "../src/config.js";
 
 describe("Firewall Tools", () => {
@@ -16,7 +16,7 @@ describe("Firewall Tools", () => {
 
   it("should register list_firewall_policies tool", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
-    const client = new FortiApiClient(mockConfig);
+    const client = new FortiGateClient(mockConfig);
     
     registerFirewallTools(server, client, mockConfig);
     
@@ -26,7 +26,7 @@ describe("Firewall Tools", () => {
 
   it("should register get_firewall_policy tool", () => {
     const server = new McpServer({ name: "test", version: "1.0.0" });
-    const client = new FortiApiClient(mockConfig);
+    const client = new FortiGateClient(mockConfig);
     
     registerFirewallTools(server, client, mockConfig);
     

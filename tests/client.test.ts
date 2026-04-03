@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { FortiApiClient } from "../src/client.js";
+import { FortiGateClient } from "../src/client.js";
 import { Config } from "../src/config.js";
 
-describe("FortiApiClient", () => {
-  let client: FortiApiClient;
+describe("FortiGateClient", () => {
+  let client: FortiGateClient;
   let mockConfig: Config;
 
   beforeEach(() => {
@@ -15,7 +15,7 @@ describe("FortiApiClient", () => {
       vdom: "root",
       enableWrite: false,
     };
-    client = new FortiApiClient(mockConfig);
+    client = new FortiGateClient(mockConfig);
   });
 
   it("should construct with correct config", () => {
