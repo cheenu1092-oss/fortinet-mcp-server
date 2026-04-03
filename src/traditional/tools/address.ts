@@ -1,178 +1,225 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FortiApiClient } from "../../client.js";
+import { FortiGateClient } from "../../client.js";
 import { Config } from "../../config.js";
 
 export function registerAddressTools(
   server: McpServer,
-  client: FortiApiClient,
+  client: FortiGateClient,
   config: Config
 ): void {
-  // list_address_objects
+  // list_firewall_addresses
   server.registerTool(
-    "list_address_objects",
+    "list_firewall_addresses",
     {
       description: "List firewall address objects",
       inputSchema: {
         name: z.string().optional().describe("Filter by address name"),
         type: z
-          .enum(["ipmask", "iprange", "fqdn", "geography", "dynamic"])
+          .enum([
+            "ipmask",
+            "iprange",
+            "fqdn",
+            "geography",
+            "wildcard",
+            "dynamic",
+          ])
           .optional()
           .describe("Filter by address type"),
       },
     },
     async (args) => {
-      const params: Record<string, string> = {};
-      
-      if (args.name) params["name"] = args.name;
-      if (args.type) params["type"] = args.type;
+      let results = await client.get<unknown[]>("cmdb/firewall/address");
 
-      const response = await client.get("/cmdb/firewall/address", params);
+      // Apply filters
+      if (args.name) {
+        results = results.filter((a: any) =>
+          a.name?.toLowerCase().includes(args.name!.toLowerCase())
+        );
+      }
+      if (args.type) {
+        results = results.filter((a: any) => a.type === args.type);
+      }
+
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );
 
-  // get_address_object
+  // get_firewall_address
   server.registerTool(
-    "get_address_object",
+    "get_firewall_address",
     {
-      description: "Get a specific address object by name",
+      description: "Get a specific firewall address object",
       inputSchema: {
-        name: z.string().describe("Address object name"),
+        name: z.string().describe("Address object name (mkey)"),
       },
     },
     async (args) => {
-      const response = await client.get(`/cmdb/firewall/address/${args.name}`);
+      const result = await client.get(`cmdb/firewall/address/${args.name}`);
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  // list_address_groups
+  server.registerTool(
+    "list_address_groups",
+    {
+      description: "List firewall address groups",
+      inputSchema: {
+        name: z.string().optional().describe("Filter by group name"),
+      },
+    },
+    async (args) => {
+      let results = await client.get<unknown[]>("cmdb/firewall/addrgrp");
+
+      if (args.name) {
+        results = results.filter((g: any) =>
+          g.name?.toLowerCase().includes(args.name!.toLowerCase())
+        );
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );
 
   // Write operations (gated by --enable-write)
   if (config.enableWrite) {
-    // create_address_object
+    // create_firewall_address
     server.registerTool(
-      "create_address_object",
+      "create_firewall_address",
       {
-        description: "Create a new address object",
+        description: "Create a new firewall address object",
         inputSchema: {
           name: z.string().describe("Address object name"),
           type: z
-            .enum(["ipmask", "iprange", "fqdn", "geography"])
-            .optional()
-            .describe("Address type (default: ipmask)"),
+            .enum([
+              "ipmask",
+              "iprange",
+              "fqdn",
+              "geography",
+              "wildcard",
+              "dynamic",
+            ])
+            .describe("Address type"),
           subnet: z
             .string()
             .optional()
-            .describe("Subnet in CIDR notation (for ipmask type, e.g. 192.168.1.0/24)"),
-          start_ip: z.string().optional().describe("Start IP (for iprange type)"),
-          end_ip: z.string().optional().describe("End IP (for iprange type)"),
+            .describe("Subnet in CIDR format (for ipmask)"),
+          start_ip: z
+            .string()
+            .optional()
+            .describe("Start IP (for iprange)"),
+          end_ip: z.string().optional().describe("End IP (for iprange)"),
           fqdn: z.string().optional().describe("FQDN (for fqdn type)"),
-          country: z.string().optional().describe("Country code (for geography type)"),
+          country: z.string().optional().describe("Country code (for geography)"),
           comment: z.string().optional().describe("Comment"),
         },
       },
       async (args) => {
-        const type = args.type ?? "ipmask";
         const body: Record<string, unknown> = {
           name: args.name,
-          type,
+          type: args.type,
         };
-
-        if (type === "ipmask") {
-          if (!args.subnet) throw new Error("subnet is required for ipmask type");
-          body.subnet = args.subnet;
-        } else if (type === "iprange") {
-          if (!args.start_ip || !args.end_ip) {
-            throw new Error("start_ip and end_ip are required for iprange type");
-          }
-          body["start-ip"] = args.start_ip;
-          body["end-ip"] = args.end_ip;
-        } else if (type === "fqdn") {
-          if (!args.fqdn) throw new Error("fqdn is required for fqdn type");
-          body.fqdn = args.fqdn;
-        } else if (type === "geography") {
-          if (!args.country) throw new Error("country is required for geography type");
-          body.country = args.country;
-        }
 
         if (args.comment) body.comment = args.comment;
 
-        const response = await client.post("/cmdb/firewall/address", body);
+        // Type-specific fields
+        switch (args.type) {
+          case "ipmask":
+            if (!args.subnet)
+              throw new Error("subnet is required for ipmask type");
+            body.subnet = args.subnet;
+            break;
+          case "iprange":
+            if (!args.start_ip || !args.end_ip)
+              throw new Error("start_ip and end_ip are required for iprange type");
+            body["start-ip"] = args.start_ip;
+            body["end-ip"] = args.end_ip;
+            break;
+          case "fqdn":
+            if (!args.fqdn) throw new Error("fqdn is required for fqdn type");
+            body.fqdn = args.fqdn;
+            break;
+          case "geography":
+            if (!args.country)
+              throw new Error("country is required for geography type");
+            body.country = args.country;
+            break;
+        }
+
+        const result = await client.post("cmdb/firewall/address", body);
         return {
           content: [
             {
               type: "text",
-              text: `Created address object: ${JSON.stringify(response, null, 2)}`,
+              text: `Created firewall address: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
       }
     );
 
-    // update_address_object
+    // update_firewall_address
     server.registerTool(
-      "update_address_object",
+      "update_firewall_address",
       {
-        description: "Update an existing address object",
+        description: "Update an existing firewall address object",
         inputSchema: {
-          name: z.string().describe("Address object name to update"),
-          subnet: z.string().optional().describe("New subnet (for ipmask type)"),
-          start_ip: z.string().optional().describe("New start IP (for iprange type)"),
-          end_ip: z.string().optional().describe("New end IP (for iprange type)"),
-          fqdn: z.string().optional().describe("New FQDN (for fqdn type)"),
+          name: z.string().describe("Address object name (mkey)"),
           comment: z.string().optional().describe("New comment"),
+          subnet: z.string().optional().describe("New subnet (for ipmask)"),
+          fqdn: z.string().optional().describe("New FQDN (for fqdn type)"),
         },
       },
       async (args) => {
-        const { name, ...updates } = args;
-        
-        if (Object.keys(updates).length === 0) {
+        const body: Record<string, unknown> = {};
+
+        if (args.comment !== undefined) body.comment = args.comment;
+        if (args.subnet !== undefined) body.subnet = args.subnet;
+        if (args.fqdn !== undefined) body.fqdn = args.fqdn;
+
+        if (Object.keys(body).length === 0) {
           throw new Error("At least one field must be provided for update");
         }
 
-        const body: Record<string, unknown> = {};
-        if (updates.subnet) body.subnet = updates.subnet;
-        if (updates.start_ip) body["start-ip"] = updates.start_ip;
-        if (updates.end_ip) body["end-ip"] = updates.end_ip;
-        if (updates.fqdn) body.fqdn = updates.fqdn;
-        if (updates.comment) body.comment = updates.comment;
-
-        const response = await client.put(`/cmdb/firewall/address/${name}`, body);
+        const result = await client.put(
+          "cmdb/firewall/address",
+          args.name,
+          body
+        );
         return {
           content: [
             {
               type: "text",
-              text: `Updated address object ${name}: ${JSON.stringify(response, null, 2)}`,
+              text: `Updated firewall address: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };
       }
     );
 
-    // delete_address_object
+    // delete_firewall_address
     server.registerTool(
-      "delete_address_object",
+      "delete_firewall_address",
       {
-        description: "Delete an address object",
+        description: "Delete a firewall address object",
         inputSchema: {
-          name: z.string().describe("Address object name to delete"),
+          name: z.string().describe("Address object name (mkey)"),
         },
       },
       async (args) => {
-        const response = await client.delete(`/cmdb/firewall/address/${args.name}`);
+        const result = await client.delete("cmdb/firewall/address", args.name);
         return {
           content: [
             {
               type: "text",
-              text: `Deleted address object ${args.name}: ${JSON.stringify(response, null, 2)}`,
+              text: `Deleted firewall address ${args.name}: ${JSON.stringify(result, null, 2)}`,
             },
           ],
         };

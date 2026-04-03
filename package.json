@@ -20,7 +20,14 @@
     "type": "git",
     "url": "git+https://github.com/cheenu1092-oss/fortinet-mcp-server.git"
   },
-  "keywords": ["fortinet", "fortigate", "firewall", "mcp", "ai", "automation"],
+  "keywords": [
+    "fortinet",
+    "fortigate",
+    "firewall",
+    "mcp",
+    "ai",
+    "automation"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {

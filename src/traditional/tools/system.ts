@@ -1,43 +1,24 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FortiApiClient } from "../../client.js";
+import { FortiGateClient } from "../../client.js";
 import { Config } from "../../config.js";
 
 export function registerSystemTools(
   server: McpServer,
-  client: FortiApiClient,
+  client: FortiGateClient,
   config: Config
 ): void {
   // get_system_status
   server.registerTool(
     "get_system_status",
     {
-      description: "Get system status (version, uptime, resources)",
+      description: "Get FortiGate system status and information",
       inputSchema: {},
     },
     async () => {
-      const response = await client.get("/monitor/system/status");
+      const result = await client.get("monitor/system/status");
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
-      };
-    }
-  );
-
-  // get_system_resources
-  server.registerTool(
-    "get_system_resources",
-    {
-      description: "Get system resource usage (CPU, memory, disk)",
-      inputSchema: {},
-    },
-    async () => {
-      const response = await client.get("/monitor/system/resource/usage");
-      return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     }
   );
@@ -52,14 +33,16 @@ export function registerSystemTools(
       },
     },
     async (args) => {
-      const params: Record<string, string> = {};
-      if (args.name) params["name"] = args.name;
+      let results = await client.get<unknown[]>("cmdb/system/interface");
 
-      const response = await client.get("/cmdb/system/interface", params);
+      if (args.name) {
+        results = results.filter((i: any) =>
+          i.name?.toLowerCase().includes(args.name!.toLowerCase())
+        );
+      }
+
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );
@@ -68,60 +51,60 @@ export function registerSystemTools(
   server.registerTool(
     "get_interface",
     {
-      description: "Get a specific interface by name",
+      description: "Get specific interface details",
       inputSchema: {
         name: z.string().describe("Interface name"),
       },
     },
     async (args) => {
-      const response = await client.get(`/cmdb/system/interface/${args.name}`);
+      const result = await client.get(`cmdb/system/interface/${args.name}`);
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     }
   );
 
-  // list_static_routes
+  // list_routes
   server.registerTool(
-    "list_static_routes",
+    "list_routes",
     {
       description: "List static routes",
       inputSchema: {},
     },
     async () => {
-      const response = await client.get("/cmdb/router/static");
+      const results = await client.get("cmdb/router/static");
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );
 
-  // get_sessions
+  // get_system_performance
   server.registerTool(
-    "get_sessions",
+    "get_system_performance",
     {
-      description: "Get active sessions (connections)",
-      inputSchema: {
-        count: z.number().optional().describe("Number of sessions to return (default: 100)"),
-        srcaddr: z.string().optional().describe("Filter by source IP"),
-        dstaddr: z.string().optional().describe("Filter by destination IP"),
-      },
+      description: "Get system performance statistics",
+      inputSchema: {},
     },
-    async (args) => {
-      const params: Record<string, string> = {};
-      if (args.count) params["count"] = String(args.count);
-      if (args.srcaddr) params["srcaddr"] = args.srcaddr;
-      if (args.dstaddr) params["dstaddr"] = args.dstaddr;
-
-      const response = await client.get("/monitor/firewall/session", params);
+    async () => {
+      const result = await client.get("monitor/system/performance/status");
       return {
-        content: [
-          { type: "text", text: JSON.stringify(response.results, null, 2) },
-        ],
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  // list_vdoms
+  server.registerTool(
+    "list_vdoms",
+    {
+      description: "List virtual domains (VDOMs)",
+      inputSchema: {},
+    },
+    async () => {
+      const results = await client.get("cmdb/system/vdom");
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );

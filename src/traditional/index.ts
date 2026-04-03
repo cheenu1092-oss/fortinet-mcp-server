@@ -2,20 +2,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "../config.js";
-import { FortiApiClient } from "../client.js";
+import { FortiGateClient } from "../client.js";
 import { registerFirewallTools } from "./tools/firewall.js";
 import { registerAddressTools } from "./tools/address.js";
 import { registerSystemTools } from "./tools/system.js";
 
-async function main() {
+async function main(): Promise<void> {
   const config = loadConfig();
-  const client = new FortiApiClient(config);
+  const client = new FortiGateClient(config);
+
   const server = new McpServer({
     name: "fortinet-mcp-server",
     version: "1.0.0",
   });
 
-  // Register tool modules
   registerFirewallTools(server, client, config);
   registerAddressTools(server, client, config);
   registerSystemTools(server, client, config);
@@ -23,12 +23,16 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("Fortinet MCP server running on stdio");
-  console.error(`Write operations: ${config.enableWrite ? "ENABLED" : "DISABLED"}`);
-  console.error(`VDOM: ${config.vdom}`);
+  if (config.enableWrite) {
+    process.stderr.write("[fortinet-mcp] Write mode ENABLED\n");
+  } else {
+    process.stderr.write(
+      "[fortinet-mcp] Read-only mode (pass --enable-write to enable mutations)\n"
+    );
+  }
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
+main().catch((err) => {
+  process.stderr.write(`[fortinet-mcp] Fatal error: ${String(err)}\n`);
   process.exit(1);
 });
